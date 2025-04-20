@@ -26,6 +26,12 @@
 ```bash
 pip install transformers huggingface_hub humanize
 ```
+### рекомендую
+Установить `pip`:
+```bash
+pip install torch
+```
+
 
 ## Установка и запуск
 1. Убедитесь, что Python и все необходимые библиотеки установлены.
