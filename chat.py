@@ -1,10 +1,14 @@
 import tkinter as tk
 from tkinter import messagebox
+import torch
 
 class ChatHandler:
     def __init__(self, app):
         self.app = app
         self.selected_model = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.chat_history = []  # Список для хранения истории диалога
+        print(f"Using device: {self.device}")
 
     def start_chat(self):
         if not self.app.model_handler.models:
@@ -17,6 +21,7 @@ class ChatHandler:
             return
 
         self.selected_model = list(self.app.model_handler.models.values())[selected_index[0]]
+        self.chat_history = []  # Очищаем историю при старте нового чата
         self.app.ui.create_chat_ui()
 
     def send_message(self, event=None):
@@ -32,23 +37,50 @@ class ChatHandler:
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
 
-            inputs = tokenizer(user_input, return_tensors="pt", padding=True, truncation=True)
+            # Добавляем сообщение пользователя в историю
+            self.chat_history.append({"role": "user", "content": user_input})
 
+            # Формируем полный текст для модели (включая историю)
+            conversation = ""
+            for message in self.chat_history:
+                if message["role"] == "user":
+                    conversation += f"User: {message['content']}\n"
+                else:
+                    conversation += f"Bot: {message['content']}\n"
+
+            # Токенизируем весь текст (включая историю)
+            inputs = tokenizer(conversation, return_tensors="pt", padding=True, truncation=True)
+
+            # Перенос модели и данных на устройство
+            model = model.to(self.device)
+            inputs = {key: val.to(self.device) for key, val in inputs.items()}
+
+            # Генерация ответа
             outputs = model.generate(
                 input_ids=inputs['input_ids'],
                 attention_mask=inputs['attention_mask'],
-                max_length=50,
+                max_length=150,
                 num_return_sequences=1,
                 pad_token_id=tokenizer.eos_token_id,
-                temperature=0.7,
+                temperature=0.1,
                 top_k=50,
                 top_p=0.9,
                 repetition_penalty=1.2
             )
+
+            # Декодируем ответ
             response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            if response.startswith(user_input):
-                response = response[len(user_input):].strip()
+
+            # Удаляем входной текст из ответа, если он там есть
+            if response.startswith(conversation):
+                response = response[len(conversation):].strip()
+
+            # Добавляем ответ модели в историю
+            self.chat_history.append({"role": "bot", "content": response})
+
+            # Отображаем ответ
             self.display_message(f"Бот: {response}", "bot")
+
         except Exception as e:
             self.display_message(f"Ошибка: {e}", "error")
 
