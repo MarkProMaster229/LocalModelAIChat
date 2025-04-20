@@ -27,7 +27,7 @@
 pip install transformers huggingface_hub humanize
 ```
 ### рекомендую
-Установить ``:
+Установить :
 ```bash
 pip install torch
 ```
